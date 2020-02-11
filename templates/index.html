@@ -1,0 +1,158 @@
+{% verbatim %}
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width">
+  <title>Poor Man's Twitter</title>
+
+  <link href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
+  <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vue@2.5.16/dist/vue.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.bundle.min.js" integrity="sha384-6khuMg9gaYr5AxOqhkVIODVIvm9ynTT5J4V1cfthmT+emCG6yVmEZsRHdxlotUnm" crossorigin="anonymous"></script>
+  <style>
+    [v-cloak] {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="pmt" class="container" v-cloak>
+
+    <h1 class="text-center">Poor Man's Twitter</h1>
+
+    <form v-on:submit="sendTweet" action="#">
+      <div class="row">
+        <div class="offset-md-3 col-md-2">
+          <input type="text" v-model="name" class="form-control" placeholder="Name" required minlength="3" maxlength="60">
+        </div>
+        <div class="col-md-4">
+          <input type="text"  v-model="text" class="form-control" placeholder="Text me!" required minlength="3" maxlength="140">
+        </div>
+        <div class="col-md-2">
+          <button class="btn btn-primary" type="submit">
+            Tweet
+          </button>
+          <div class="position-absolute w-100 d-flex flex-column p-4" style="z-index:999999">
+            <div class="toast" id="tweetToast" data-delay="3000" role="alert" aria-live="assertive" aria-atomic="true">
+              <div class="toast-header">
+                <strong class="mr-auto"><i class="fa fa-grav"></i> Great!</strong>
+                <button type="button" class="ml-2 mb-1 close" data-dismiss="toast" aria-label="Close">
+                  <span aria-hidden="true">&times;</span>
+                </button>
+              </div>
+              <div class="toast-body">
+                Text Sent
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </form>
+    
+    <div class="dropdown d-flex flex-row-reverse mb-2">
+      <button class="btn btn-dark dropdown-toggle" type="button" id="dropdownMenuButton" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+        Sort by
+      </button>
+      <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">
+        <a class="dropdown-item" v-on:click="loadData('name')">Name <i v-if="sort=='name'" class="fa fa-check"></i></a>
+        <a class="dropdown-item" v-on:click="loadData('created_at')">Date <i v-if="sort=='created_at'" class="fa fa-check"></i></a>
+      </div>
+    </div>
+    <table class="table table-striped p-2" v-if="tweets.length">
+      <thead class="thead-dark">
+      <tr>
+        <th scope="col">Name</th>
+        <th scope="col">Text</th>
+        <th scope="col">Date</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr v-for="tweet in tweets">
+        <td>{{ tweet.name }}</td>
+        <td>{{ tweet.text }}</td>
+        <td>{{ tweet.created_at | date }}</td>
+      </tr>
+    </tbody>
+    </table>
+
+  </div>
+  
+    
+<script>
+    let API_SERVER = '/api';
+    window.onload = function startUp() {
+        //Recommend to use vue-moment, but cant import extra libs
+        //TODO: use components
+        Vue.filter('date', (value) => {
+          const date = new Date(value)
+          return date.toLocaleDateString(['en-US'], {month: 'short', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'}) 
+        })
+
+        var app = new Vue({
+        el: '#pmt',
+        data: {
+          tweets: [],
+          name: '',
+          text: '',
+          sort: 'name'
+        },
+        methods: {
+          loadData(sort) {
+            this.sort = sort || this.sort;
+              $.getJSON(`${API_SERVER}/tweet?ordering=${this.sort}`,function(tweets){
+                this.tweets = tweets;
+              }.bind(this));
+          },
+          
+          sendTweet() {
+              console.log('tweet', this.name, this.text)
+
+              $.ajax({
+                url: `${API_SERVER}/tweet/`,
+                type: 'POST',
+                headers: {
+                  'X-CSRFToken': getCookie('csrftoken')
+                },
+                dataType: "json",
+                contentType: "application/json; charset=utf-8",
+                data: JSON.stringify({
+                  name: this.name,
+                  text: this.text
+                }),
+                success: () => {
+                  $("#tweetToast").toast('show');
+                  this.text ='';
+                  this.loadData();
+                }
+              });
+
+          }
+        },
+        mounted() {
+          this.loadData();
+        }
+        });
+    }
+    function getCookie(name) {
+      var cookieValue = null;
+      if (document.cookie && document.cookie !== '') {
+          var cookies = document.cookie.split(';');
+          for (var i = 0; i < cookies.length; i++) {
+              var cookie = cookies[i].trim();
+              // Does this cookie string begin with the name we want?
+              if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                  cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                  break;
+              }
+          }
+      }
+      return cookieValue;
+  }
+
+</script>
+
+</body>
+</html>
+{% endverbatim %}
